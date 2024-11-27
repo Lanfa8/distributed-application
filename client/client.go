@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"distributed-app/client/process_data_menu"
 	"distributed-app/schemas"
 	"encoding/binary"
 	"encoding/json"
@@ -32,7 +33,6 @@ func NewClient() (*Client, error) {
 }
 
 func (c *Client) sendAction(action interface{}) error {
-	// Marshal the action to JSON
 	jsonData, err := json.Marshal(action)
 	if err != nil {
 		return fmt.Errorf("error marshaling: %v", err)
@@ -50,6 +50,55 @@ func (c *Client) sendAction(action interface{}) error {
 	_, err = c.conn.Write(jsonData)
 	if err != nil {
 		return fmt.Errorf("error sending action json: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Client) sendFileAction() error {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter the file path: ")
+	cfilepath, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("error reading input: %v", err)
+	}
+
+	cfilepath = strings.TrimSpace(cfilepath)
+
+	file, err := os.Open(cfilepath)
+	if err != nil {
+		return fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("error getting file info: %v", err)
+	}
+	fileSize := fileInfo.Size()
+
+	sizeBuffer := make([]byte, 8)
+	for i := 0; i < 8; i++ {
+		sizeBuffer[i] = byte(fileSize >> (i * 8))
+	}
+
+	action := schemas.SendFileAction{
+		Action:   schemas.SEND_FILE_ACTION,
+		FileName: "new_devices.csv",
+		Filesize: sizeBuffer,
+	}
+
+	err = c.sendAction(action)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Sending file %s (%.2f MB)...\n", action.FileName, float64(fileSize)/1024/1024)
+
+	err = c.sendFileInChunks(file, fileSize)
+	if err != nil {
+		return fmt.Errorf("error during file transfer: %v", err)
 	}
 
 	return nil
@@ -86,67 +135,50 @@ func (c *Client) sendFileInChunks(file *os.File, fileSize int64) error {
 	return nil
 }
 
-func (c *Client) sendFileAction() error {
+func (c *Client) processDataMenu() error {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Print("Enter the file path: ")
-	cfilepath, err := reader.ReadString('\n')
+	device, err := process_data_menu.GetDevice(reader)
 	if err != nil {
-		return fmt.Errorf("error reading input: %v", err)
-	}
-
-	cfilepath = strings.TrimSpace(cfilepath)
-
-	file, err := os.Open(cfilepath)
-	if err != nil {
-		return fmt.Errorf("error opening file: %v", err)
-	}
-	defer file.Close()
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("error getting file info: %v", err)
-	}
-	fileSize := fileInfo.Size()
-
-	// Create size buffer (8 bytes for int64)
-	sizeBuffer := make([]byte, 8)
-	for i := 0; i < 8; i++ {
-		sizeBuffer[i] = byte(fileSize >> (i * 8))
-	}
-
-	// Create action with just the base filename
-	action := schemas.SendFileAction{
-		Action:   "send_file",
-		FileName: "new_devices.csv",
-		Filesize: sizeBuffer,
-	}
-
-	// Send the action
-	err = c.sendAction(action)
-	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
 		return err
 	}
 
-	fmt.Printf("Sending file %s (%.2f MB)...\n", action.FileName, float64(fileSize)/1024/1024)
-
-	err = c.sendFileInChunks(file, fileSize)
+	method, err := process_data_menu.GetMethod(reader, *device)
 	if err != nil {
-		return fmt.Errorf("error during file transfer: %v", err)
+		fmt.Printf("Error reading input: %v\n", err)
+		return err
 	}
+
+	fileName, err := process_data_menu.GetFileName(reader)
+	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
+		return err
+	}
+
+	processes, err := process_data_menu.GetProcessesNumber(reader, *method)
+	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
+		return err
+	}
+
+	attempts, err := process_data_menu.GetAttemptsNumber(reader)
+	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
+		return err
+	}
+
+	processAction := schemas.ProcessAction{
+		Action:    schemas.PROCESS_ACTION,
+		FileName:  *fileName,
+		Method:    *method,
+		Attempts:  *attempts,
+		Processes: *processes,
+	}
+
+	fmt.Printf("Final action: %v\n", processAction)
 
 	return nil
-}
-
-func (c *Client) otherActionTest() error {
-	action := schemas.OtherAction{
-		Action:           "other_action",
-		OtherActionData1: "teste1",
-		OtherActionData2: "teste2",
-	}
-
-	fmt.Println("Sending other action")
-	return c.sendAction(action)
 }
 
 func (c *Client) Close() {
@@ -166,7 +198,7 @@ func main() {
 	for {
 		fmt.Println("\nChoose an action:")
 		fmt.Println("1. Send file")
-		fmt.Println("2. Other action")
+		fmt.Println("2. Process data")
 		fmt.Println("5. Exit")
 
 		action, err := reader.ReadString('\n')
@@ -183,8 +215,9 @@ func main() {
 			if err != nil {
 				fmt.Printf("Error sending file: %v\n", err)
 			}
+
 		case "2":
-			err = client.otherActionTest()
+			err = client.processDataMenu()
 			if err != nil {
 				fmt.Printf("Error sending other action: %v\n", err)
 			}

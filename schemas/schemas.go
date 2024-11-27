@@ -1,17 +1,42 @@
 package schemas
 
+type ActionType string
+
+const (
+	SEND_FILE_ACTION ActionType = "send_file"
+	PROCESS_ACTION   ActionType = "process_action"
+)
+
+type Device string
+
+const (
+	GPU Device = "gpu"
+	CPU Device = "cpu"
+)
+
+type Method string
+
+const (
+	OPENMP      Method = "openmp"
+	MPI         Method = "mpi"
+	GO_ROUTINES Method = "go_routines"
+	CUDA        Method = "cuda"
+)
+
 type Action struct {
-	Action string `json:"action"`
+	Action ActionType `json:"action"`
 }
 
 type SendFileAction struct {
-	Action   string `json:"action"`
-	FileName string `json:"fileName"`
-	Filesize []byte `json:"filesize"`
+	Action   ActionType `json:"action"`
+	FileName string     `json:"fileName"`
+	Filesize []byte     `json:"filesize"`
 }
 
-type OtherAction struct {
-	Action           string `json:"action"`
-	OtherActionData1 string `json:"other_action_data_1"`
-	OtherActionData2 string `json:"other_action_data_2"`
+type ProcessAction struct {
+	Action    ActionType `json:"action"`
+	FileName  string     `json:"fileName"`
+	Processes int        `json:"processes"`
+	Method    Method     `json:"method"`
+	Attempts  int        `json:"attempts"`
 }

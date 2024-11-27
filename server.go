@@ -76,12 +76,12 @@ func receiveFile(conn net.Conn, sendFileAction schemas.SendFileAction) error {
 	return nil
 }
 
-func handleOtherAction(otherAction schemas.OtherAction) error {
-	fmt.Printf("Handling Other Action: \n")
-	fmt.Printf("Action Data 1: %s\n", otherAction.OtherActionData1)
-	fmt.Printf("Action Data 2: %s\n", otherAction.OtherActionData2)
-	return nil
-}
+// func handleOtherAction(otherAction schemas.OtherAction) error {
+// 	fmt.Printf("Handling Other Action: \n")
+// 	fmt.Printf("Action Data 1: %s\n", otherAction.OtherActionData1)
+// 	fmt.Printf("Action Data 2: %s\n", otherAction.OtherActionData2)
+// 	return nil
+// }
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
@@ -116,7 +116,7 @@ func handleConnection(conn net.Conn) {
 		}
 
 		switch baseAction.Action {
-		case "send_file":
+		case schemas.SEND_FILE_ACTION:
 			var sendFileAction schemas.SendFileAction
 			if err := json.Unmarshal(messageBuffer, &sendFileAction); err != nil {
 				fmt.Printf("Error parsing file data: %v\n", err)
@@ -127,16 +127,16 @@ func handleConnection(conn net.Conn) {
 				fmt.Printf("Error receiving file: %v\n", err)
 			}
 
-		case "other_action":
-			var otherAction schemas.OtherAction
-			if err := json.Unmarshal(messageBuffer, &otherAction); err != nil {
-				fmt.Printf("Error parsing other action data: %v\n", err)
-				return
-			}
-			err := handleOtherAction(otherAction)
-			if err != nil {
-				fmt.Printf("Error handling other action: %v\n", err)
-			}
+		// case "other_action":
+		// 	var otherAction schemas.OtherAction
+		// 	if err := json.Unmarshal(messageBuffer, &otherAction); err != nil {
+		// 		fmt.Printf("Error parsing other action data: %v\n", err)
+		// 		return
+		// 	}
+		// 	err := handleOtherAction(otherAction)
+		// 	if err != nil {
+		// 		fmt.Printf("Error handling other action: %v\n", err)
+		// 	}
 
 		default:
 			fmt.Printf("Unknown action type: %s\n", baseAction.Action)
