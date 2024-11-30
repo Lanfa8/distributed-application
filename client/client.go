@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -162,21 +163,32 @@ func (c *Client) processDataMenu() error {
 		return err
 	}
 
-	attempts, err := process_data_menu.GetAttemptsNumber(reader)
-	if err != nil {
-		fmt.Printf("Error reading input: %v\n", err)
-		return err
-	}
+	// attempts, err := process_data_menu.GetAttemptsNumber(reader)
+	// if err != nil {
+	// 	fmt.Printf("Error reading input: %v\n", err)
+	// 	return err
+	// }
 
 	processAction := schemas.ProcessAction{
 		Action:    schemas.PROCESS_ACTION,
 		FileName:  *fileName,
 		Method:    *method,
-		Attempts:  *attempts,
+		Attempts:  1,
 		Processes: *processes,
 	}
 
-	fmt.Printf("Final action: %v\n", processAction)
+	fmt.Printf("Processing...\n")
+	c.sendAction(processAction)
+
+	responseBuffer := make([]byte, 32768)
+	n, err := c.conn.Read(responseBuffer)
+	if err != nil {
+		log.Printf("Error reading response: %v\n", err)
+		return err
+	}
+
+	fmt.Printf("End processing\n")
+	fmt.Print(string(responseBuffer[:n]))
 
 	return nil
 }

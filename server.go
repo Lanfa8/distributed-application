@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"distributed-app/schemas"
 	"encoding/binary"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -76,12 +78,30 @@ func receiveFile(conn net.Conn, sendFileAction schemas.SendFileAction) error {
 	return nil
 }
 
-// func handleOtherAction(otherAction schemas.OtherAction) error {
-// 	fmt.Printf("Handling Other Action: \n")
-// 	fmt.Printf("Action Data 1: %s\n", otherAction.OtherActionData1)
-// 	fmt.Printf("Action Data 2: %s\n", otherAction.OtherActionData2)
-// 	return nil
-// }
+func runBashCommand(command string) (string, error) {
+	cmd := exec.Command("bash", "-c", command)
+
+	var output bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("error executing command: %v\nCommand: %s\nStdout: %s\nStderr: %s",
+			err, command, output.String(), stderr.String())
+	}
+
+	return output.String(), nil
+}
+
+func handleOpenMPMethod(schema schemas.ProcessAction) (string, error) {
+	command := fmt.Sprintf("./openmp/openmp ./data/%s %d", schema.FileName, schema.Processes)
+
+	fmt.Printf("command: %s\n", command)
+
+	return runBashCommand(command)
+}
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
@@ -126,7 +146,18 @@ func handleConnection(conn net.Conn) {
 			if err != nil {
 				fmt.Printf("Error receiving file: %v\n", err)
 			}
+		case schemas.PROCESS_ACTION:
+			var processAction schemas.ProcessAction
+			if err := json.Unmarshal(messageBuffer, &processAction); err != nil {
+				fmt.Printf("Error parsing action data: %v\n", err)
+				return
+			}
 
+			out, err := handleOpenMPMethod(processAction)
+			if err != nil {
+				fmt.Printf("Error processing action: %v\n", err)
+			}
+			conn.Write([]byte(out))
 		// case "other_action":
 		// 	var otherAction schemas.OtherAction
 		// 	if err := json.Unmarshal(messageBuffer, &otherAction); err != nil {

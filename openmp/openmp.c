@@ -329,30 +329,8 @@ StaticInterval* get_top_intervals(StaticInterval** devices_top_intervals, int nu
     return top_intervals;
 }
 
-int main(int argc, char *argv[]) {
-    int threads = atoi(argv[2]);
-    char* file_to_process = argv[1];
-
+void runProcess(int threads, SensorData* data, int total_records) {
     omp_set_num_threads(threads);
-
-    SensorData* data = calloc(MAX_RECORDS, sizeof(SensorData));
-    if (!data) {
-        fprintf(stderr, "Memory allocation failed\n");
-        return 1;
-    }
-
-    int total_records = read_csv(file_to_process, data, MAX_RECORDS);
-    
-    if (total_records <= 0) {
-        fprintf(stderr, "Failed to read CSV or no records found\n");
-        free(data);
-        return 1;
-    }
-
-    struct timespec inicio, fim;
-    double tempo;
-    srand(time(NULL));
-    clock_gettime(CLOCK_MONOTONIC, &inicio);
 
     char* metrics[] = {"etvoc", "eco2", "ruido"};
 
@@ -377,10 +355,11 @@ int main(int argc, char *argv[]) {
         StaticInterval* over_all_top_intervals = get_top_intervals(devices_top_intervals, device_count, TOP_INTERVALS_COUNT);
         
         if (over_all_top_intervals != NULL) {
-            printf("%s\n", metrics[m]);
-            printf("device|interval_duration|value\n");
+            printf("====================================================================================\n");
+            printf("Métrica: %s\n", metrics[m]);
+            printf("%-30s|%-20s|%-20s\n", "device", "interval_duration", "value");
             for (int i = 0; i < TOP_INTERVALS_COUNT; i++) {
-                printf("%s|%f|%f\n",over_all_top_intervals[i].device,over_all_top_intervals[i].interval_duration,over_all_top_intervals[i].static_value);
+                printf("%-30s|%-20.2f|%-20.2f\n",over_all_top_intervals[i].device,over_all_top_intervals[i].interval_duration,over_all_top_intervals[i].static_value);
             }
             
             free(over_all_top_intervals);
@@ -396,10 +375,44 @@ int main(int argc, char *argv[]) {
         }
         free(devices_top_intervals);
     }
+}
 
+int main(int argc, char *argv[]) {
+    int threads = atoi(argv[2]);
+    char* file_to_process = argv[1];
+    struct timespec inicio, fim;
+    double tempo1, tempo2;
+    srand(time(NULL));
+
+    SensorData* data = calloc(MAX_RECORDS, sizeof(SensorData));
+    if (!data) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return 1;
+    }
+
+    int total_records = read_csv(file_to_process, data, MAX_RECORDS);
+    
+    if (total_records <= 0) {
+        fprintf(stderr, "Failed to read CSV or no records found\n");
+        free(data);
+        return 1;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &inicio);
+    printf("Processamento single thread --------------------------------->\n");
+    runProcess(1, data, total_records);
     clock_gettime(CLOCK_MONOTONIC, &fim);
-    tempo = (fim.tv_sec - inicio.tv_sec) + (fim.tv_nsec - inicio.tv_nsec) / 1e9;
-    printf("%.9f\n", tempo);
+    tempo1 = (fim.tv_sec - inicio.tv_sec) + (fim.tv_nsec - inicio.tv_nsec) / 1e9;
+    
+    clock_gettime(CLOCK_MONOTONIC, &inicio);
+    printf("Processamento multi thread --------------------------------->\n");
+    runProcess(threads, data, total_records);
+    clock_gettime(CLOCK_MONOTONIC, &fim);
+    tempo2 = (fim.tv_sec - inicio.tv_sec) + (fim.tv_nsec - inicio.tv_nsec) / 1e9;
+    
+    printf("Tempo processamento single thread: %.9f\n", tempo1);
+    printf("Tempo processamento com threads: %.9f\n", tempo2);
+    printf("Speedup: %.9f\n", tempo1/tempo2);
 
     free(data);
 
