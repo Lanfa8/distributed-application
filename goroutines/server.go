@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	numWorkers    = 1
 	resultLimit   = 50
 	minValidCols  = 10
 	dateLayout    = "2006-01-02 15:04:05.000000"
@@ -39,12 +38,14 @@ type Interval struct {
 
 func main() {
 	csvPath := flag.String("csv", "", "Path to the CSV file")
+	processes := flag.Int("processes", 1, "Number of worker processes")
 	flag.Parse()
 
 	if *csvPath == "" {
-		log.Fatalf("Usage: %s -csv <csv_path>", os.Args[0])
+		log.Fatalf("Usage: %s -csv <csv_path> -processes <num_workers>", os.Args[0])
 	}
 
+	numWorkers := *processes
 	log.Printf("Number of workers: %d", numWorkers)
 	startTime := time.Now()
 	records, err := readAndParseCSV(*csvPath)
@@ -63,7 +64,7 @@ func main() {
 	results := make(map[string][]Interval)
 
 	for _, field := range fields {
-		intervals := processField(deviceData, field)
+		intervals := processField(deviceData, field, numWorkers)
 		results[field] = intervals
 	}
 	log.Printf("Processing completed in %v", time.Since(processStart))
@@ -154,12 +155,11 @@ func groupByDevice(records []Record) map[string][]Record {
 	return deviceData
 }
 
-func processField(deviceData map[string][]Record, field string) []Interval {
+func processField(deviceData map[string][]Record, field string, numWorkers int) []Interval {
 	var intervals []Interval
 	var mutex sync.Mutex
 	var wg sync.WaitGroup
 	jobs := make(chan []Record, len(deviceData))
-
 
 	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
@@ -275,8 +275,6 @@ func getFieldPointer(record Record, field string) *float64 {
 		return nil
 	}
 }
-
-
 
 func sortAndLimitIntervals(intervals []Interval, limit int) []Interval {
 	for i := 0; i < len(intervals); i++ {
