@@ -4,8 +4,6 @@ import time
 import multiprocessing
 from collections import defaultdict
 
-CSV_FILE_PATH = '../devices.csv'
-
 def parse_float(value):
 	try:
 		return float(value)
@@ -172,13 +170,15 @@ def main():
 	import argparse
 	parser = argparse.ArgumentParser(description='Processamento de dados dos sensores.')
 	parser.add_argument('--processes', type=int, default=1, help='Número de processos a serem utilizados.')
+	parser.add_argument('--csv_path', type=str, required=True, help='Caminho para o arquivo CSV.')
 	args = parser.parse_args()
 	num_processes = args.processes
+	csv_file_path = args.csv_path
 	start_time = time.time()
 
 	print("Lendo e agrupando os dados...")
 
-	devices_data = read_and_group_data(CSV_FILE_PATH)
+	devices_data = read_and_group_data(csv_file_path)
 	read_time = time.time()
 
 	print(f"Leitura e agrupamento dos dados concluídos em {read_time - start_time:.2f} segundos.")
@@ -195,11 +195,6 @@ def main():
 
 	print(f"Obtidos os maiores intervalos em {get_top_time - process_time:.2f} segundos.")
 	total_time = get_top_time - start_time
-
-	print(f"Tempo total de processamento: {total_time:.2f} segundos.\n")
-	print("Resultados:\n")
-
-	display_intervals(top_intervals)
 
 if __name__ == '__main__':
 	main()

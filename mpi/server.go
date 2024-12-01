@@ -68,18 +68,19 @@ func main() {
 		fmt.Printf("Número de threads utilizados: %d\n", numProcs)
 	}
 
-	csvPath := "../devices.csv"
+	var csvPath string
+	flag.StringVar(&csvPath, "csv", "", "Path to the CSV file")
 	flag.Parse()
 	if csvPath == "" {
 		if rank == 0 {
-			fmt.Println("Usage: mpirun -np <num_procs> go run main.go")
+			fmt.Println("Usage: mpirun -np <num_procs> go run main.go -csv <path_to_csv>")
 		}
 		return
 	}
 
 	file, err := os.Open(csvPath)
 	if err != nil {
-		if rank == 0 {
+		if rank != 0 {
 			fmt.Println("Error opening CSV file:", err)
 		}
 		return
@@ -169,7 +170,6 @@ func main() {
 	var intervalsRuido []Interval
 
 	for deviceID, records := range deviceData {
-		// Sort records by timestamp
 		sort.Slice(records, func(i, j int) bool {
 			return records[i].Timestamp.Before(records[j].Timestamp)
 		})
