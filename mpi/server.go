@@ -164,16 +164,16 @@ func main() {
 		deviceData[deviceID] = append(deviceData[deviceID], record)
 	}
 
+	csvReadEndTime := mpi.WorldTime()
+	if rank == 0 {
+		fmt.Printf("Tempo de leitura do CSV: %.4f segundos\n", csvReadEndTime-startTime)
+	}
 
 	var intervalsEtvoc []Interval
 	var intervalsEco2 []Interval
 	var intervalsRuido []Interval
 
 	for deviceID, records := range deviceData {
-		sort.Slice(records, func(i, j int) bool {
-			return records[i].Timestamp.Before(records[j].Timestamp)
-		})
-
 		intervals := findIntervals(records, deviceID, "etvoc")
 		intervalsEtvoc = append(intervalsEtvoc, intervals...)
 
@@ -226,8 +226,10 @@ func main() {
 	mpiCommunicator.Barrier()
 	endTime := mpi.WorldTime()
 
+	
 	if rank == 0 {
-		fmt.Printf("\nTempo total de processamento: %.4f segundos\n", endTime-startTime)
+		fmt.Printf("Tempo de processamento: %.4f segundos\n", endTime-csvReadEndTime)
+		fmt.Printf("\nTempo total: %.4f segundos\n", endTime-startTime)
 	}
 }
 
@@ -362,9 +364,5 @@ func printIntervals(intervals []Interval) {
 		fmt.Printf("Dispositivo: %s, Valor: %.2f, Início: %s, Fim: %s, Duração: %s\n",
 			interval.DeviceID, interval.Value, interval.Start.Format("2006-01-02 15:04:05"),
 			interval.End.Format("2006-01-02 15:04:05"), interval.Duration)
-
-		// fmt.Printf("%s|%.6f|%.6f|%s|%s\n",
-		//      interval.DeviceID, interval.Duration.Seconds(), interval.Value, interval.Start.Format("2006-01-02 15:04:05.999999"),
-		//      interval.End.Format("2006-01-02 15:04:05.999999"), )
 	}
 }
