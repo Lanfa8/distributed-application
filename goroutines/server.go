@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -13,7 +14,6 @@ import (
 )
 
 const (
-	csvPath       = "../devices.csv"
 	numWorkers    = 1
 	resultLimit   = 50
 	minValidCols  = 10
@@ -38,9 +38,16 @@ type Interval struct {
 }
 
 func main() {
+	csvPath := flag.String("csv", "", "Path to the CSV file")
+	flag.Parse()
+
+	if *csvPath == "" {
+		log.Fatalf("Usage: %s -csv <csv_path>", os.Args[0])
+	}
+
 	log.Printf("Number of workers: %d", numWorkers)
 	startTime := time.Now()
-	records, err := readAndParseCSV(csvPath)
+	records, err := readAndParseCSV(*csvPath)
 	if err != nil {
 		log.Fatalf("Error reading CSV: %v", err)
 	}
