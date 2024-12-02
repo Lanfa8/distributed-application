@@ -103,6 +103,30 @@ func handleOpenMPMethod(schema schemas.ProcessAction) (string, error) {
 	return runBashCommand(command)
 }
 
+func handlePythonMethod(schema schemas.ProcessAction) (string, error) {
+	command := fmt.Sprintf("python3 ./multiprocessing_python/server.py --processes %d --csv_path ./data/%s", schema.Processes, schema.FileName)
+
+	fmt.Printf("command: %s\n", command)
+
+	return runBashCommand(command)
+}
+
+func handleMPIMethod(schema schemas.ProcessAction) (string, error) {
+	command := fmt.Sprintf("mpirun -np %d go run ./mpi/server.go -csv ./data/%s", schema.Processes, schema.FileName)
+
+	fmt.Printf("command: %s\n", command)
+
+	return runBashCommand(command)
+}
+
+func handleGoroutinesMethod(schema schemas.ProcessAction) (string, error) {
+	command := fmt.Sprintf("go run ./goroutines/server.go -processes %d -csv ./data/%s", schema.Processes, schema.FileName)
+
+	fmt.Printf("command: %s\n", command)
+
+	return runBashCommand(command)
+}
+
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	fmt.Println("New connection from:", conn.RemoteAddr())
@@ -153,21 +177,35 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 
-			out, err := handleOpenMPMethod(processAction)
-			if err != nil {
-				fmt.Printf("Error processing action: %v\n", err)
+			switch processAction.Method {
+			case schemas.OPENMP:
+				out, err := handleOpenMPMethod(processAction)
+				if err != nil {
+					fmt.Printf("Error processing action: %v\n", err)
+				}
+				conn.Write([]byte(out))
+			case schemas.GO_ROUTINES:
+				out, err := handleGoroutinesMethod(processAction)
+				if err != nil {
+					fmt.Printf("Error processing action: %v\n", err)
+				}
+				conn.Write([]byte(out))
+			case schemas.MPI:
+				out, err := handleMPIMethod(processAction)
+				if err != nil {
+					fmt.Printf("Error processing action: %v\n", err)
+				}
+				conn.Write([]byte(out))
+			case schemas.PYTHON_MULTIPROCESSING:
+				out, err := handlePythonMethod(processAction)
+				if err != nil {
+					fmt.Printf("Error processing action: %v\n", err)
+				}
+				conn.Write([]byte(out))
+			default:
+				fmt.Printf("Not allowed method \n")
+				conn.Write([]byte("Not allowed method \n"))
 			}
-			conn.Write([]byte(out))
-		// case "other_action":
-		// 	var otherAction schemas.OtherAction
-		// 	if err := json.Unmarshal(messageBuffer, &otherAction); err != nil {
-		// 		fmt.Printf("Error parsing other action data: %v\n", err)
-		// 		return
-		// 	}
-		// 	err := handleOtherAction(otherAction)
-		// 	if err != nil {
-		// 		fmt.Printf("Error handling other action: %v\n", err)
-		// 	}
 
 		default:
 			fmt.Printf("Unknown action type: %s\n", baseAction.Action)

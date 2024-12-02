@@ -17,10 +17,11 @@ const (
 type Method string
 
 const (
-	OPENMP      Method = "openmp"
-	MPI         Method = "mpi"
-	GO_ROUTINES Method = "go_routines"
-	CUDA        Method = "cuda"
+	OPENMP                 Method = "openmp"
+	MPI                    Method = "mpi"
+	GO_ROUTINES            Method = "go_routines"
+	CUDA                   Method = "cuda"
+	PYTHON_MULTIPROCESSING Method = "python_multiprocessing"
 )
 
 type Action struct {

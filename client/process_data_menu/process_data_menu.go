@@ -12,7 +12,7 @@ func GetDevice(reader *bufio.Reader) (*schemas.Device, error) {
 	for {
 		fmt.Println("\nChoose a device:")
 		fmt.Println("1. CPU")
-		fmt.Println("2. GPU")
+		// fmt.Println("2. GPU")
 
 		device, err := reader.ReadString('\n')
 		if err != nil {
@@ -43,8 +43,9 @@ func GetMethod(reader *bufio.Reader, device schemas.Device) (*schemas.Method, er
 			fmt.Println("1. OpenMP (C)")
 			fmt.Println("2. MPI (Go)")
 			fmt.Println("3. Goroutines (Go)")
+			fmt.Println("4. Multiprocessing (Python)")
 		} else {
-			fmt.Println("4. Cuda (CUDA)")
+			fmt.Println("5. Cuda (CUDA)")
 		}
 
 		method, err := reader.ReadString('\n')
@@ -80,6 +81,13 @@ func GetMethod(reader *bufio.Reader, device schemas.Device) (*schemas.Method, er
 			res := schemas.GO_ROUTINES
 			return &res, nil
 		case "4":
+			if device != schemas.CPU {
+				fmt.Println("Invalid option. Please try again.")
+				continue
+			}
+			res := schemas.PYTHON_MULTIPROCESSING
+			return &res, nil
+		case "5":
 			if device != schemas.GPU {
 				fmt.Println("Invalid option. Please try again.")
 				continue
