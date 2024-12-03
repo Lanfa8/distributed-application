@@ -39,13 +39,11 @@ type Interval struct {
 	Duration time.Duration
 }
 
-
 type ByDuration []Interval
 
 func (a ByDuration) Len() int           { return len(a) }
 func (a ByDuration) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByDuration) Less(i, j int) bool { return a[i].Duration > a[j].Duration } // Descending
-
 
 type Record struct {
 	Timestamp time.Time
@@ -55,12 +53,172 @@ type Record struct {
 }
 
 func main() {
+	// Run serial code
+	startSerial := time.Now()
+	runSerial()
+	serialTotalTime := time.Since(startSerial).Seconds()
+
+	// Initialize MPI
 	mpi.Start(false)
-	mpiCommunicator := mpi.NewCommunicator(nil)
+	mpiComm := mpi.NewCommunicator(nil)
+	rank := mpi.WorldRank()
 	defer mpi.Stop()
 
-	numProcs := mpi.WorldSize()
-	rank := mpi.WorldRank()
+	// Synchronize before starting MPI code
+	mpiComm.Barrier()
+
+	mpiStartTime := mpi.WorldTime()
+
+	runMPI(mpiComm)
+
+	mpiComm.Barrier()
+	mpiEndTime := mpi.WorldTime()
+	mpiTotalTime := mpiEndTime - mpiStartTime
+
+	if rank == 0 {
+		fmt.Printf("Serial duration: %.4f seconds\n", serialTotalTime)
+		fmt.Printf("MPI duration: %.4f seconds\n", mpiTotalTime)
+		speedUp := serialTotalTime / mpiTotalTime
+		fmt.Printf("Speed-up: %.2f\n", speedUp)
+	}
+}
+
+func runSerial() time.Duration {
+	startTime := time.Now()
+
+	// Read CSV file
+	var csvPath string
+	flag.StringVar(&csvPath, "csv", "", "Path to the CSV file")
+	flag.Parse()
+	if csvPath == "" {
+		fmt.Println("Usage: go run main.go -csv <path_to_csv>")
+		return 0
+	}
+
+	file, err := os.Open(csvPath)
+	if err != nil {
+		fmt.Println("Error opening CSV file:", err)
+		return 0
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.Comma = '|'
+	reader.FieldsPerRecord = -1
+
+	_, err = reader.Read() // Skip header
+	if err != nil {
+		fmt.Println("Error reading CSV header:", err)
+		return 0
+	}
+
+	deviceData := make(map[string][]Record)
+
+	// Read all data
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			continue
+		}
+
+		deviceID := line[c_device]
+		dataStr := line[c_data]
+
+		if deviceID == "" || dataStr == "" || (line[c_etvoc] == "" && line[c_eco2] == "" && line[c_ruido] == "") {
+			continue
+		}
+
+		// Continue processing as in original code
+
+		layout := "2006-01-02 15:04:05.999999"
+		timestamp, err := time.Parse(layout, dataStr)
+		if err != nil {
+			continue
+		}
+
+		var etvoc *float64
+		var eco2 *float64
+		var ruido *float64
+
+		etvocStr := line[c_etvoc]
+		if etvocStr != "" {
+			v, err := strconv.ParseFloat(etvocStr, 64)
+			if err == nil {
+				etvoc = &v
+			}
+		}
+
+		eco2Str := line[c_eco2]
+		if eco2Str != "" {
+			v, err := strconv.ParseFloat(eco2Str, 64)
+			if err == nil {
+				eco2 = &v
+			}
+		}
+
+		ruidoStr := line[c_ruido]
+		if ruidoStr != "" {
+			v, err := strconv.ParseFloat(ruidoStr, 64)
+			if err == nil {
+				ruido = &v
+			}
+		}
+
+		record := Record{
+			Timestamp: timestamp,
+			Etvoc:     etvoc,
+			Eco2:      eco2,
+			Ruido:     ruido,
+		}
+		deviceData[deviceID] = append(deviceData[deviceID], record)
+	}
+
+	csvReadEndTime := time.Now()
+
+	fmt.Printf("Tempo de leitura do CSV: %.4f segundos\n", csvReadEndTime.Sub(startTime).Seconds())
+
+	// Now process data: find intervals
+
+	var intervalsEtvoc []Interval
+	var intervalsEco2 []Interval
+	var intervalsRuido []Interval
+
+	for deviceID, records := range deviceData {
+		intervals := findIntervals(records, deviceID, "etvoc")
+		intervalsEtvoc = append(intervalsEtvoc, intervals...)
+
+		intervals = findIntervals(records, deviceID, "eco2")
+		intervalsEco2 = append(intervalsEco2, intervals...)
+
+		intervals = findIntervals(records, deviceID, "ruido")
+		intervalsRuido = append(intervalsRuido, intervals...)
+	}
+
+	intervalsEtvoc = topNIntervals(intervalsEtvoc, 50)
+	intervalsEco2 = topNIntervals(intervalsEco2, 50)
+	intervalsRuido = topNIntervals(intervalsRuido, 50)
+
+	// Output results
+	fmt.Printf("Resultados para etvoc:\n")
+	printIntervals(intervalsEtvoc)
+	fmt.Printf("\nResultados para eco2:\n")
+	printIntervals(intervalsEco2)
+	fmt.Printf("\nResultados para ruido:\n")
+	printIntervals(intervalsRuido)
+
+	endTime := time.Now()
+
+	fmt.Printf("Tempo de processamento: %.4f segundos\n", endTime.Sub(csvReadEndTime).Seconds())
+	fmt.Printf("\nTempo total: %.4f segundos\n", endTime.Sub(startTime).Seconds())
+
+	return endTime.Sub(startTime)
+}
+
+func runMPI(comm *mpi.Communicator) float64 {
+	numProcs := comm.Size()
+	rank := comm.Rank()
 
 	startTime := mpi.WorldTime()
 
@@ -69,21 +227,42 @@ func main() {
 	}
 
 	var csvPath string
-	flag.StringVar(&csvPath, "csv", "", "Path to the CSV file")
-	flag.Parse()
-	if csvPath == "" {
-		if rank == 0 {
-			fmt.Println("Usage: mpirun -np <num_procs> go run main.go -csv <path_to_csv>")
+	if rank == 0 {
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+		flag.StringVar(&csvPath, "csv", "", "Path to the CSV file")
+		err := flag.CommandLine.Parse(os.Args[1:])
+		if err != nil {
+			fmt.Println("Error parsing flags:", err)
+			comm.Abort(1)
 		}
-		return
+		if csvPath == "" {
+			fmt.Println("Usage: mpirun -np <num_procs> go run main.go -csv <path_to_csv>")
+			comm.Abort(1)
+		}
 	}
+
+	// Broadcast csvPath to all processes
+	csvPathBuffer := []byte(csvPath)
+	var length int32
+	if rank == 0 {
+		length = int32(len(csvPathBuffer))
+	}
+	comm.BcastInt32s([]int32{length}, 0)
+	if rank != 0 {
+		lengthBuffer := make([]int32, 1)
+		comm.BcastInt32s(lengthBuffer, 0)
+		length = lengthBuffer[0]
+		csvPathBuffer = make([]byte, length)
+	}
+	comm.BcastBytes(csvPathBuffer, 0)
+	csvPath = string(csvPathBuffer)
 
 	file, err := os.Open(csvPath)
 	if err != nil {
-		if rank != 0 {
+		if rank == 0 {
 			fmt.Println("Error opening CSV file:", err)
 		}
-		return
+		comm.Abort(1)
 	}
 	defer file.Close()
 
@@ -91,12 +270,12 @@ func main() {
 	reader.Comma = '|'
 	reader.FieldsPerRecord = -1
 
-	_, err = reader.Read()
+	_, err = reader.Read() // Skip header
 	if err != nil {
 		if rank == 0 {
 			fmt.Println("Error reading CSV header:", err)
 		}
-		return
+		comm.Abort(1)
 	}
 
 	deviceData := make(map[string][]Record)
@@ -106,7 +285,7 @@ func main() {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			continue 
+			continue
 		}
 
 		deviceID := line[c_device]
@@ -188,7 +367,6 @@ func main() {
 	intervalsEco2 = topNIntervals(intervalsEco2, 50)
 	intervalsRuido = topNIntervals(intervalsRuido, 50)
 
-
 	if rank != 0 {
 		sendIntervals(intervalsEtvoc, 0, 100+rank*3+1)
 		sendIntervals(intervalsEco2, 0, 100+rank*3+2)
@@ -223,23 +401,22 @@ func main() {
 		printIntervals(allIntervalsRuido)
 	}
 
-	mpiCommunicator.Barrier()
+	comm.Barrier()
 	endTime := mpi.WorldTime()
 
-	
 	if rank == 0 {
 		fmt.Printf("Tempo de processamento: %.4f segundos\n", endTime-csvReadEndTime)
 		fmt.Printf("\nTempo total: %.4f segundos\n", endTime-startTime)
 	}
-}
 
+	return endTime - startTime
+}
 
 func hash(s string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return h.Sum32()
 }
-
 
 func findIntervals(records []Record, deviceID, variable string) []Interval {
 	var intervals []Interval
@@ -308,7 +485,6 @@ func findIntervals(records []Record, deviceID, variable string) []Interval {
 	return intervals
 }
 
-
 func topNIntervals(intervals []Interval, N int) []Interval {
 	sort.Sort(ByDuration(intervals))
 	if len(intervals) > N {
@@ -357,7 +533,6 @@ func decodeIntervals(data []byte) ([]Interval, error) {
 	}
 	return intervals, nil
 }
-
 
 func printIntervals(intervals []Interval) {
 	for _, interval := range intervals {
