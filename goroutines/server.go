@@ -62,17 +62,30 @@ func main() {
 
 	processStart := time.Now()
 	results := make(map[string][]Interval)
-
 	for _, field := range fields {
 		intervals := processField(deviceData, field, numWorkers)
 		results[field] = intervals
 	}
-	log.Printf("Processing completed in %v", time.Since(processStart))
+	multiThreadDuration := time.Since(processStart)
+	log.Printf("Processing with %d workers completed in %v", numWorkers, multiThreadDuration)
+
+	processStart = time.Now()
+	singleThreadResults := make(map[string][]Interval)
+	for _, field := range fields {
+		intervals := processField(deviceData, field, 1)
+		singleThreadResults[field] = intervals
+	}
+	singleThreadDuration := time.Since(processStart)
+	log.Printf("Processing with 1 worker completed in %v", singleThreadDuration)
 
 	for _, field := range fields {
 		displayResults(field, results[field])
+		displayResults(field, singleThreadResults[field])
 	}
+
+	speedUp := singleThreadDuration.Seconds() / multiThreadDuration.Seconds()
 	log.Printf("Total execution time: %v", time.Since(startTime))
+	log.Printf("Speed-up: %.2fx", speedUp)
 }
 
 func readAndParseCSV(path string) ([]Record, error) {
