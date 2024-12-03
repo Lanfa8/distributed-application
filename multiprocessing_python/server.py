@@ -182,18 +182,28 @@ def main():
 	read_time = time.time()
 
 	print(f"Leitura e agrupamento dos dados concluídos em {read_time - start_time:.2f} segundos.")
+
+	# Process with specified number of processes
 	print(f"Processando dados com {num_processes} processos...")
-
 	combined_intervals = process_all_devices(devices_data, num_processes)
-	process_time = time.time()
+	process_time_multi = time.time()
+	print(f"Processamento dos dados concluído em {process_time_multi - read_time:.2f} segundos.")
 
-	print(f"Processamento dos dados concluído em {process_time - read_time:.2f} segundos.")
+	# Process with a single process
+	print("Processando dados com 1 processo...")
+	combined_intervals_single = process_all_devices(devices_data, 1)
+	process_time_single = time.time()
+	print(f"Processamento dos dados concluído em {process_time_single - process_time_multi:.2f} segundos.")
+
+	# Calculate speed-up
+	speed_up = (process_time_single - process_time_multi) / (process_time_multi - read_time)
+	print(f"Speed-up: {speed_up:.2f}x")
+
 	print("Obtendo os 50 maiores intervalos...")
-
 	top_intervals = get_top_n_intervals(combined_intervals, n=50)
 	get_top_time = time.time()
 
-	print(f"Obtidos os maiores intervalos em {get_top_time - process_time:.2f} segundos.")
+	print(f"Obtidos os maiores intervalos em {get_top_time - process_time_single:.2f} segundos.")
 	total_time = get_top_time - start_time
 
 if __name__ == '__main__':
