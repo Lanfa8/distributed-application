@@ -14,21 +14,21 @@ import (
 )
 
 const (
-	resultLimit   = 50
-	minValidCols  = 10
-	dateLayout    = "2006-01-02 15:04:05.000000"
+	resultLimit  = 50
+	minValidCols = 10
+	dateLayout   = "2006-01-02 15:04:05.000000"
 )
 
 type Record struct {
-	Device      string
-	Timestamp   time.Time
-	Ruido       *float64
-	Eco2        *float64
-	Etvoc       *float64
+	Device    string
+	Timestamp time.Time
+	Ruido     *float64
+	Eco2      *float64
+	Etvoc     *float64
 }
 
 type Interval struct {
-	Field    string
+	Field     string
 	Device    string
 	Value     float64
 	StartTime time.Time
@@ -84,8 +84,8 @@ func main() {
 	}
 
 	speedUp := singleThreadDuration.Seconds() / multiThreadDuration.Seconds()
-	log.Printf("Total execution time: %v", time.Since(startTime))
-	log.Printf("Speed-up: %.2fx", speedUp)
+	fmt.Printf("Total execution time: %v\n", time.Since(startTime))
+	fmt.Printf("Speed-up: %.2fx\n", speedUp)
 }
 
 func readAndParseCSV(path string) ([]Record, error) {
@@ -232,11 +232,11 @@ func findIntervals(records []Record, field string) []Interval {
 			if lastValue != nil {
 				duration := endTime.Sub(startTime)
 				intervals = append(intervals, Interval{
-					Device: records[0].Device,
-					Value:    *lastValue,
-					StartTime:    startTime,
-					EndTime:      endTime,
-					Duration: duration,
+					Device:    records[0].Device,
+					Value:     *lastValue,
+					StartTime: startTime,
+					EndTime:   endTime,
+					Duration:  duration,
 				})
 				lastValue = nil
 			}
@@ -247,11 +247,11 @@ func findIntervals(records []Record, field string) []Interval {
 			if lastValue != nil {
 				duration := endTime.Sub(startTime)
 				intervals = append(intervals, Interval{
-					Device: records[0].Device,
-					Value:    *lastValue,
-					StartTime:    startTime,
-					EndTime:      endTime,
-					Duration: duration,
+					Device:    records[0].Device,
+					Value:     *lastValue,
+					StartTime: startTime,
+					EndTime:   endTime,
+					Duration:  duration,
 				})
 			}
 			lastValue = currentValue
@@ -265,11 +265,11 @@ func findIntervals(records []Record, field string) []Interval {
 	if lastValue != nil {
 		duration := endTime.Sub(startTime)
 		intervals = append(intervals, Interval{
-			Device: records[0].Device,
-			Value:    *lastValue,
-			StartTime:    startTime,
-			EndTime:      endTime,
-			Duration: duration,
+			Device:    records[0].Device,
+			Value:     *lastValue,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Duration:  duration,
 		})
 	}
 
