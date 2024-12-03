@@ -86,7 +86,7 @@ func (c *Client) sendFileAction() error {
 
 	action := schemas.SendFileAction{
 		Action:   schemas.SEND_FILE_ACTION,
-		FileName: "new_devices.csv",
+		FileName: fileInfo.Name(),
 		Filesize: sizeBuffer,
 	}
 
@@ -180,7 +180,7 @@ func (c *Client) processDataMenu() error {
 	fmt.Printf("Processing...\n")
 	c.sendAction(processAction)
 
-	responseBuffer := make([]byte, 32768)
+	responseBuffer := make([]byte, 64768)
 	n, err := c.conn.Read(responseBuffer)
 	if err != nil {
 		log.Printf("Error reading response: %v\n", err)
